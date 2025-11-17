@@ -11,11 +11,13 @@ services:
       USE_CONTAINER_AUDIO: "true"
       SKIP_AUTO_LOGIN: "false"  # Try auto-login with credentials
       GOOGLE_APPLICATION_CREDENTIALS: /workspace/google-cloud-stt.json
+      DISPLAY: ${DISPLAY}
     volumes:
       - .:/workspace
       - pnpm-store:/workspace/.pnpm-store
       - /dev/shm:/dev/shm
       - /tmp/chrome-profile:/tmp/chrome-profile  # Mount host chrome profile into container
+      - /tmp/.X11-unix:/tmp/.X11-unix  # X11 socket for GUI
     ports:
       - "3030:3030"
     cap_add:
@@ -25,6 +27,7 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    network_mode: host
     command: ["pnpm", "run", "dev:be"]
 
   frontend:

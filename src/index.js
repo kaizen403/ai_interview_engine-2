@@ -72,9 +72,9 @@ async function startBot({ meetUrl, profile }) {
   }
 
   const launchOpts = {
-    headless: true,
+    headless: false,
     executablePath: "/usr/bin/chromium",
-    userDataDir: `/tmp/chrome-profile-${Date.now()}`,  // Fresh profile each time
+    userDataDir: "/tmp/chrome-profile",  // Use persistent profile with Google login
     args: [
       "--use-fake-ui-for-media-stream",
       "--disable-web-security",
@@ -99,7 +99,7 @@ async function startBot({ meetUrl, profile }) {
   ;[page] = await browser.pages();
   page.on("console", (m) => console.log("[browser]", m.text()));
   
-  currentMeetUrl = meetUrl || MEET_URL;
+  currentMeetUrl = meetUrl || "https://meet.google.com/uym-ugyd-qyp";
   
   // Set additional properties to avoid bot detection
   await page.evaluateOnNewDocument(() => {
@@ -116,34 +116,22 @@ async function startBot({ meetUrl, profile }) {
   await page.goto(currentMeetUrl, { waitUntil: "networkidle2" });
   console.log("[bot] Meet page loaded, current URL:", page.url());
   
-  // Check if we got a 403 or other error PAGE (not just resource errors)
-  const pageTitle = await page.title();
-  console.log("[bot] Page title:", pageTitle);
+  // Wait for page to load
+  await new Promise(resolve => setTimeout(resolve, 3000));
   
-  // Check if we need to sign in
-  const pageInfo = await page.evaluate(() => {
-    const bodyText = document.body.innerText.toLowerCase();
-    return {
-      hasSignIn: bodyText.includes('sign in') || bodyText.includes('log in'),
-      hasError: bodyText.includes('error') || bodyText.includes('not found') || bodyText.includes('invalid'),
-      hasJoin: bodyText.includes('join') || bodyText.includes('ask to join'),
-      bodyPreview: document.body.innerText.substring(0, 500)
-    };
-  });
-  console.log("[bot] Page analysis:", JSON.stringify(pageInfo, null, 2));
+  // Step 1: Handle mic/camera permission prompt (automatically allowed by --use-fake-ui-for-media-stream)
+  console.log("[bot] Media permissions auto-granted by browser flags");
   
-  // Check if we need to sign in (dismiss the popup)
-  console.log("[bot] Checking for sign-in popup...");
+  // Step 2: Dismiss "Sign in" popup by clicking "Got it"
+  console.log("[bot] Looking for 'Got it' or dismiss button...");
   try {
-    // Wait for page to stabilize
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Look for "Got it" or "Continue without signing in" button
     const dismissedPopup = await page.evaluate(() => {
-      const buttons = [...document.querySelectorAll("button, [role='button']")];
+      const buttons = [...document.querySelectorAll("button, [role='button'], span[role='button']")];
       for (const btn of buttons) {
         const text = (btn.innerText || btn.textContent || '').toLowerCase().trim();
-        if (text.includes('got it') || text.includes('continue without') || text.includes('dismiss')) {
+        if (text === 'got it' || text.includes('got it') || text.includes('continue without')) {
           console.log('Found dismiss button:', text);
           btn.click();
           return true;
@@ -153,47 +141,17 @@ async function startBot({ meetUrl, profile }) {
     });
     
     if (dismissedPopup) {
-      console.log("[bot] Dismissed sign-in popup");
-      await new Promise(resolve => setTimeout(resolve, 4000));  // Wait longer for page to stabilize
+      console.log("[bot] ✅ Clicked 'Got it' button");
+      await new Promise(resolve => setTimeout(resolve, 3000));
     } else {
-      console.log("[bot] No sign-in popup found");
+      console.log("[bot] No 'Got it' button found, continuing...");
     }
   } catch (e) {
-    console.log("[bot] No popup to dismiss");
+    console.log("[bot] Error dismissing popup:", e.message);
   }
   
-  // Check if we're actually on a Meet page
-  if (!page.url().includes("meet.google.com")) {
-    console.error("[bot] Not on Meet page, got redirected to:", page.url());
-    throw new Error("Was redirected away from Google Meet");
-  }
-  
-  // Turn off camera and microphone before joining
-  console.log("[bot] Looking for camera and microphone toggles...");
-  try {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Try to find and click camera/mic buttons to turn them off
-    const buttons = await page.$$('button');
-    console.log("[bot] Found", buttons.length, "buttons on the page");
-    
-    // Look for buttons with aria-label containing "camera" or "microphone"
-    for (const button of buttons) {
-      try {
-        const ariaLabel = await button.evaluate(el => el.getAttribute('aria-label'));
-        if (ariaLabel && (ariaLabel.toLowerCase().includes('camera') || ariaLabel.toLowerCase().includes('microphone'))) {
-          console.log("[bot] Found media button with aria-label:", ariaLabel);
-        }
-      } catch (e) {
-        // Skip if error reading button
-      }
-    }
-  } catch (e) {
-    console.log("[bot] Could not find camera/mic toggles, continuing...");
-  }
-  
-  // Check if we need to enter a name (anonymous join)
-  console.log("[bot] Checking for name input field...");
+  // Step 3: Enter name in the input box
+  console.log("[bot] Looking for name input field...");
   try {
     const nameInput = await page.$('input[placeholder*="name" i], input[aria-label*="name" i], input[type="text"]');
     if (nameInput) {
@@ -201,13 +159,13 @@ async function startBot({ meetUrl, profile }) {
       await nameInput.click();
       await new Promise(resolve => setTimeout(resolve, 500));
       await nameInput.type(botName, { delay: 50 });
-      console.log("[bot] Entered name:", botName);
+      console.log("[bot] ✅ Entered name:", botName);
       await new Promise(resolve => setTimeout(resolve, 1000));
     } else {
       console.log("[bot] No name input found");
     }
   } catch (e) {
-    console.log("[bot] No name input found or already filled:", e.message);
+    console.log("[bot] Error entering name:", e.message);
   }
   
   console.log("[bot] Looking for join button...");
