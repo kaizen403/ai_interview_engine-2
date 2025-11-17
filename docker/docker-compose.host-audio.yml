@@ -1,0 +1,17 @@
+services:
+  backend:
+    environment:
+      USE_CONTAINER_AUDIO: "false"
+      PULSE_SERVER: unix:/tmp/pulse/native
+      PULSE_COOKIE: /tmp/pulse/cookie
+      XDG_RUNTIME_DIR: /tmp/pulse
+    volumes:
+      - .:/workspace
+      - backend_node_modules:/workspace/node_modules
+      - chrome_profile:/workspace/chrome-profile
+      - pnpm-store:/workspace/.pnpm-store
+      - ${PULSE_SOCKET_DIR:-/run/user/1000/pulse}:/tmp/pulse
+    group_add:
+      - audio
+    devices:
+      - /dev/snd:/dev/snd

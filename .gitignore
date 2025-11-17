@@ -1,0 +1,42 @@
+# Environment and credentials
+.env
+*.env
+oauth2-credentials.json
+oauth2-token.json
+google-cloud-stt.json
+
+# Frontend
+salesfe/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+pnpm-lock.yaml
+
+# Chrome profiles and data
+chrome-profile/
+/tmp/chrome-profile/
+data/
+
+# Docker volumes
+docker/volumes/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temp files
+tmp/
+temp/
+*.tmp

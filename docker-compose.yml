@@ -1,0 +1,50 @@
+services:
+  backend:
+    build:
+      context: .
+    # user: "${HOST_UID:-1000}:${HOST_GID:-1000}"  # Temporarily commented out to fix Chrome permissions
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PNPM_STORE_DIR: /tmp/pnpm-store
+      USE_CONTAINER_AUDIO: "true"
+      SKIP_AUTO_LOGIN: "false"  # Try auto-login with credentials
+      GOOGLE_APPLICATION_CREDENTIALS: /workspace/google-cloud-stt.json
+    volumes:
+      - .:/workspace
+      - pnpm-store:/workspace/.pnpm-store
+      - /dev/shm:/dev/shm
+      - /tmp/chrome-profile:/tmp/chrome-profile  # Mount host chrome profile into container
+    ports:
+      - "3030:3030"
+    cap_add:
+      - SYS_NICE
+    security_opt:
+      - seccomp:unconfined
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    command: ["pnpm", "run", "dev:be"]
+
+  frontend:
+    build:
+      context: .
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://backend:3030}
+      PNPM_STORE_DIR: /workspace/.pnpm-store
+    volumes:
+      - .:/workspace
+      - frontend_node_modules:/workspace/salesfe/node_modules
+      - pnpm-store:/workspace/.pnpm-store
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    command: ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+
+volumes:
+  frontend_node_modules:
+  chrome_profile:
+  pnpm-store:

@@ -1,0 +1,65 @@
+#!/bin/bash
+set -e
+
+cd /home/kaizen/ai_screener
+
+echo "=========================================="
+echo "Starting AI Screener Bot"
+echo "=========================================="
+echo ""
+
+# Stop any existing containers
+echo "Stopping existing containers..."
+docker compose down 2>/dev/null || true
+
+# Start backend
+echo "Starting backend..."
+docker compose up -d backend
+
+# Wait for backend to be ready
+echo "Waiting for backend to start..."
+sleep 8
+
+# Check if backend is running
+if ! curl -s http://localhost:3030/api/bot/status > /dev/null; then
+    echo "❌ Backend failed to start!"
+    echo "Check logs with: docker compose logs backend"
+    exit 1
+fi
+
+echo "✅ Backend is running!"
+echo ""
+echo "=========================================="
+echo "Joining Google Meet"
+echo "=========================================="
+echo ""
+
+# Join the meeting
+MEET_URL="${1:-https://meet.google.com/tts-vcoy-tyg}"
+echo "Meeting URL: $MEET_URL"
+echo ""
+
+curl -X POST http://localhost:3030/api/bot/start \
+  -H "Content-Type: application/json" \
+  -d "{\"meetUrl\": \"$MEET_URL\"}"
+
+echo ""
+echo ""
+echo "=========================================="
+echo "Bot Started!"
+echo "=========================================="
+echo ""
+echo "Commands:"
+echo "  Check status:  curl http://localhost:3030/api/bot/status"
+echo "  Stop bot:      curl -X POST http://localhost:3030/api/bot/stop"
+echo "  View logs:     docker compose logs -f backend"
+echo ""
+echo "⚠️  IMPORTANT:"
+echo "If you see 'You can't join this video call', you need to:"
+echo "1. In Google Meet, tap the notification to admit 'AI Screener'"
+echo "   OR"
+echo "2. Change meeting settings to allow anyone with link to join"
+echo ""
+echo "Watching logs (Ctrl+C to exit)..."
+echo "=========================================="
+docker compose logs -f backend
